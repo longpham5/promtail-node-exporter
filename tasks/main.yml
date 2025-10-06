@@ -1,31 +1,34 @@
 ---
 # tasks/main.yml
 
-- name: Ensure keyrings directory exists
-  file:
+- name: Ensure /etc/apt/keyrings exists
+  ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
 
-- name: Download and install Grafana GPG key
-  ansible.builtin.shell: |
-    curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+- name: Download Grafana GPG key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /etc/apt/keyrings/grafana.key
+    mode: '0644'
+
+- name: Convert Grafana key to gpg format
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/grafana.gpg /etc/apt/keyrings/grafana.key
   args:
     creates: /etc/apt/keyrings/grafana.gpg
-    executable: /bin/bash
 
-- name: Ensure GPG key has correct permissions
-  ansible.builtin.file:
-    path: /etc/apt/keyrings/grafana.gpg
-    mode: '0644'
+- name: Add Grafana repository file
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/grafana.list
+    content: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main\n"
     owner: root
     group: root
+    mode: '0644'
 
-- name: Add Grafana repository
-  ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
-    state: present
-    filename: grafana
+- name: Update apt cache
+  ansible.builtin.apt:
     update_cache: yes
 
 - name: Install Promtail
