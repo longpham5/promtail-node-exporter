@@ -1,0 +1,121 @@
+---
+# tasks/main.yml
+
+- name: Ensure keyrings directory exists
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Grafana GPG key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /etc/apt/keyrings/grafana.gpg
+    mode: '0644'
+  register: grafana_key
+
+- name: Add Grafana repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+    update_cache: yes
+
+- name: Install Promtail
+  ansible.builtin.apt:
+    name: promtail
+    state: present
+    update_cache: yes
+
+- name: Deploy Promtail configuration
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: /etc/promtail/config.yml
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  notify: restart promtail
+
+- name: Ensure /var/log/mail.log is readable
+  ansible.builtin.file:
+    path: /var/log/mail.log
+    mode: '0644'
+
+- name: Add promtail user to adm group (for log access)
+  ansible.builtin.user:
+    name: promtail
+    groups: adm
+    append: yes
+  notify: restart promtail
+
+- name: Enable Promtail service
+  ansible.builtin.systemd:
+    name: promtail
+    enabled: yes
+    state: started
+
+# Install node exporter
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - wget
+      - tar
+    state: present
+    update_cache: yes
+
+- name: Create node_exporter user
+  ansible.builtin.user:
+    name: node_exporter
+    shell: /usr/sbin/nologin
+    system: yes
+    create_home: no
+
+- name: Check if node_exporter is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/node_exporter
+  register: node_exporter_bin
+
+- name: Download node_exporter
+  ansible.builtin.get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+    dest: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+    mode: '0644'
+  when: not node_exporter_bin.stat.exists
+- name: Extract node_exporter
+  ansible.builtin.unarchive:
+    src: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+    dest: /tmp/
+    remote_src: yes
+    creates: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter
+  when: not node_exporter_bin.stat.exists
+
+- name: Copy node_exporter binary to /usr/local/bin
+  ansible.builtin.copy:
+    src: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: '0755'
+  when: not node_exporter_bin.stat.exists
+
+- name: Cleanup temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64"
+  when: not node_exporter_bin.stat.exists
+
+- name: Create systemd service file for node_exporter
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+    notify:
+      - Reload systemd
+      - Start and enable node_exporter
+

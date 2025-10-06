@@ -1,0 +1,5 @@
+# vars file
+---
+promtail_http_port: 9080
+loki_url: https://loki.longppham5.xyz/loki/api/v1/push
+node_exporter_version: 1.9.1
