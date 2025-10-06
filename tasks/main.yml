@@ -14,7 +14,7 @@
       - gnupg
     state: present
     update_cache: yes
-    
+
 - name: Download and install Grafana GPG key
   ansible.builtin.shell: |
     curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
@@ -56,7 +56,7 @@
     group: root
     mode: '0644'
     backup: yes
-  notify: restart promtail
+  notify: Restart promtail
 
 - name: Ensure /var/log/mail.log is readable
   ansible.builtin.file:
@@ -68,7 +68,7 @@
     name: promtail
     groups: adm
     append: yes
-  notify: restart promtail
+  notify: Restart promtail
 
 - name: Enable Promtail service
   ansible.builtin.systemd:
