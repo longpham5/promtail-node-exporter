@@ -55,7 +55,6 @@
     owner: root
     group: root
     mode: '0644'
-    backup: yes
   notify: Restart promtail
 
 - name: Ensure /var/log/mail.log is readable
