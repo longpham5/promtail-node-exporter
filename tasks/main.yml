@@ -118,6 +118,7 @@
     owner: root
     group: root
     mode: '0755'
+    remote_src: yes
   when: not node_exporter_bin.stat.exists
 
 - name: Cleanup temporary files
