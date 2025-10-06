@@ -137,7 +137,7 @@
     owner: root
     group: root
     mode: '0644'
-    notify:
-      - Reload systemd
-      - Start and enable node_exporter
+  notify:
+    - Reload systemd
+    - Start and enable node_exporter
 
